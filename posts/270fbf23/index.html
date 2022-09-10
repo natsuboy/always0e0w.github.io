@@ -1,0 +1,812 @@
+
+
+<!DOCTYPE html>
+<html lang="zh-CN" data-default-color-scheme=auto>
+
+
+
+<head><!-- hexo injector head_begin start --><script>
+(function(){
+    var bp = document.createElement('script');
+    var curProtocol = window.location.protocol.split(':')[0];
+    if (curProtocol === 'https') {
+        bp.src = 'https://zz.bdstatic.com/linksubmit/push.js';        
+    }
+    else {
+        bp.src = 'http://push.zhanzhang.baidu.com/push.js';
+    }
+    var s = document.getElementsByTagName("script")[0];
+    s.parentNode.insertBefore(bp, s);
+})();
+</script>
+<!-- hexo injector head_begin end -->
+  <meta charset="UTF-8">
+  <link rel="apple-touch-icon" sizes="76x76" href="/img/apple-icon.png">
+  <link rel="icon" href="/img/favicon.ico">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, shrink-to-fit=no">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  
+    <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
+  
+  <meta name="theme-color" content="#2f4154">
+  <meta name="author" content="always0e0w">
+  <meta name="keywords" content="Hexo,Go,Golang,LeetCode,博客,后端">
+  
+    <meta name="description" content="功能模块功能截图：    变更功能：添加记录、删除记录、清空历史等。 读取功能：按照时间线返回topN、获取某个视频的观看进度信息等。 其他功能：暂停&#x2F;回复记录、首次观看某视频触发某逻辑（比如增加经验）。  特点：观看历史记录类型的业务，是一个极高TPS写入（端上需要定期上报观看进度，比如5s一次）和QPS读取的业务（每次观看视频的时候都要获取该视频的观看进度）。 架构设计">
+<meta property="og:type" content="article">
+<meta property="og:title" content="播放历史架构设计">
+<meta property="og:url" content="https://whitehole.dev/posts/270fbf23/index.html">
+<meta property="og:site_name" content="white hole">
+<meta property="og:description" content="功能模块功能截图：    变更功能：添加记录、删除记录、清空历史等。 读取功能：按照时间线返回topN、获取某个视频的观看进度信息等。 其他功能：暂停&#x2F;回复记录、首次观看某视频触发某逻辑（比如增加经验）。  特点：观看历史记录类型的业务，是一个极高TPS写入（端上需要定期上报观看进度，比如5s一次）和QPS读取的业务（每次观看视频的时候都要获取该视频的观看进度）。 架构设计">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://whitehole.dev/posts/270fbf23/view-history.png">
+<meta property="og:image" content="https://whitehole.dev/posts/270fbf23/history-system-design.png">
+<meta property="og:image" content="https://whitehole.dev/posts/270fbf23/history-service.png">
+<meta property="og:image" content="https://whitehole.dev/posts/270fbf23/hbase.png">
+<meta property="og:image" content="https://whitehole.dev/posts/270fbf23/redis.png">
+<meta property="article:published_time" content="2022-03-18T13:18:48.000Z">
+<meta property="article:modified_time" content="2022-09-10T00:45:27.620Z">
+<meta property="article:author" content="always0e0w">
+<meta property="article:tag" content="系统设计">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://whitehole.dev/posts/270fbf23/view-history.png">
+  
+  
+  
+  <title>播放历史架构设计 - white hole</title>
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/twitter-bootstrap/4.6.1/css/bootstrap.min.css" />
+
+
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/github-markdown-css/4.0.0/github-markdown.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/hint.css/2.7.0/hint.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.css" />
+
+
+
+<!-- 主题依赖的图标库，不要自行修改 -->
+<!-- Do not modify the link that theme dependent icons -->
+
+<link rel="stylesheet" href="//at.alicdn.com/t/font_1749284_hj8rtnfg7um.css">
+
+
+
+<link rel="stylesheet" href="https://at.alicdn.com/t/font_1736178_kmeydafke9r.css">
+
+
+<link  rel="stylesheet" href="/css/main.css" />
+
+
+  <link id="highlight-css" rel="stylesheet" href="/css/highlight.css" />
+  
+    <link id="highlight-css-dark" rel="stylesheet" href="/css/highlight-dark.css" />
+  
+
+
+
+  
+<link rel="stylesheet" href="/css/custom.css">
+
+
+
+  <script id="fluid-configs">
+    var Fluid = window.Fluid || {};
+    Fluid.ctx = Object.assign({}, Fluid.ctx)
+    var CONFIG = {"hostname":"whitehole.dev","root":"/","version":"1.9.2","typing":{"enable":true,"typeSpeed":70,"cursorChar":"_","loop":false,"scope":[]},"anchorjs":{"enable":true,"element":"h1,h2,h3,h4,h5,h6","placement":"left","visible":"hover","icon":""},"progressbar":{"enable":true,"height_px":3,"color":"#29d","options":{"showSpinner":false,"trickleSpeed":100}},"code_language":{"enable":true,"default":"TEXT"},"copy_btn":true,"image_caption":{"enable":true},"image_zoom":{"enable":true,"img_url_replace":["",""]},"toc":{"enable":true,"placement":"right","headingSelector":"h1,h2,h3,h4,h5,h6","collapseDepth":0},"lazyload":{"enable":true,"loading_img":"/img/loading.gif","onlypost":false,"offset_factor":2},"web_analytics":{"enable":true,"follow_dnt":true,"baidu":null,"google":null,"gtag":null,"tencent":{"sid":null,"cid":null},"woyaola":null,"cnzz":null,"leancloud":{"app_id":"D1eRICWLjdh1OSlCnSIuaEjf-MdYXbMMI","app_key":"2d8uXdo4Rk8dWcd1ao7fSjkp","server_url":null,"path":"window.location.pathname","ignore_local":false}},"search_path":"/local-search.xml"};
+
+    if (CONFIG.web_analytics.follow_dnt) {
+      var dntVal = navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack;
+      Fluid.ctx.dnt = dntVal && (dntVal.startsWith('1') || dntVal.startsWith('yes') || dntVal.startsWith('on'));
+    }
+  </script>
+  <script  src="/js/utils.js" ></script>
+  <script  src="/js/color-schema.js" ></script>
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+  
+
+
+
+  
+<meta name="generator" content="Hexo 6.3.0"></head>
+
+
+<body>
+  
+
+  <header>
+    
+
+<div class="header-inner" style="height: 70vh;">
+  <nav id="navbar" class="navbar fixed-top  navbar-expand-lg navbar-dark scrolling-navbar">
+  <div class="container">
+    <a class="navbar-brand" href="/">
+      <strong>white hole</strong>
+    </a>
+
+    <button id="navbar-toggler-btn" class="navbar-toggler" type="button" data-toggle="collapse"
+            data-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <div class="animated-icon"><span></span><span></span><span></span></div>
+    </button>
+
+    <!-- Collapsible content -->
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav ml-auto text-center">
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/">
+                <i class="iconfont icon-home-fill"></i>
+                首页
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/archives/">
+                <i class="iconfont icon-archive-fill"></i>
+                归档
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/categories/">
+                <i class="iconfont icon-category-fill"></i>
+                分类
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/tags/">
+                <i class="iconfont icon-tags-fill"></i>
+                标签
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle" target="_self" href="javascript:;" role="button"
+                 data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                
+                更多
+              </a>
+              <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+                
+                  
+                  
+                  
+                  <a class="dropdown-item" href="/about/">
+                    <i class="iconfont icon-user-fill"></i>
+                    关于
+                  </a>
+                
+                  
+                  
+                  
+                  <a class="dropdown-item" target="_blank" rel="noopener external nofollow noreferrer" href="https://status.whitehole.dev/">
+                    
+                    Uptime
+                  </a>
+                
+                  
+                  
+                  
+                  <a class="dropdown-item" target="_blank" rel="noopener external nofollow noreferrer" href="https://pan.whitehole.dev/">
+                    
+                    OneDrive
+                  </a>
+                
+              </div>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/links/">
+                <i class="iconfont icon-link-fill"></i>
+                友链
+              </a>
+            </li>
+          
+        
+        
+          <li class="nav-item" id="search-btn">
+            <a class="nav-link" target="_self" href="javascript:;" rel="external nofollow noreferrer" data-toggle="modal" data-target="#modalSearch" aria-label="Search">
+              &nbsp;<i class="iconfont icon-search"></i>&nbsp;
+            </a>
+          </li>
+          
+        
+        
+          <li class="nav-item" id="color-toggle-btn">
+            <a class="nav-link" target="_self" href="javascript:;" rel="external nofollow noreferrer" aria-label="Color Toggle">&nbsp;<i
+                class="iconfont icon-dark" id="color-toggle-icon"></i>&nbsp;</a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</nav>
+
+  
+
+<div id="banner" class="banner" parallax=true
+     style="background: url('https://tuapi.eees.cc/api.php?category=fengjing&type=302') no-repeat center center; background-size: cover;">
+  <div class="full-bg-img">
+    <div class="mask flex-center" style="background-color: rgba(0, 0, 0, 0.3)">
+      <div class="banner-text text-center fade-in-up">
+        <div class="h2">
+          
+            <span id="subtitle" data-typed-text="播放历史架构设计"></span>
+          
+        </div>
+
+        
+          
+  <div class="mt-3">
+    
+    
+      <span class="post-meta">
+        <i class="iconfont icon-date-fill" aria-hidden="true"></i>
+        <time datetime="2022-03-18 21:18" pubdate>
+          2022年3月18日 晚上
+        </time>
+      </span>
+    
+  </div>
+
+  <div class="mt-1">
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-chart"></i>
+        
+          <!-- compatible with older versions-->
+          3.2k 字
+        
+      </span>
+    
+
+    
+
+    
+    
+      
+        <span id="leancloud-page-views-container" class="post-meta" style="display: none">
+          <i class="iconfont icon-eye" aria-hidden="true"></i>
+          <span id="leancloud-page-views"></span> 次
+        </span>
+        
+      
+    
+  </div>
+
+
+        
+      </div>
+
+      
+    </div>
+  </div>
+</div>
+
+</div>
+
+  </header>
+
+  <main>
+    
+      
+
+<div class="container-fluid nopadding-x">
+  <div class="row nomargin-x">
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+
+    </div>
+
+    <div class="col-lg-8 nopadding-x-md">
+      <div class="container nopadding-x-md" id="board-ctn">
+        <div id="board">
+          <article class="post-content mx-auto">
+            <!-- SEO header -->
+            <h1 style="display: none">播放历史架构设计</h1>
+            
+              <p class="note note-info">
+                
+                  
+                    <!-- compatible with older versions-->
+                    本文最后更新于：2022年9月10日 早上
+                  
+                
+              </p>
+            
+            
+              <div class="markdown-body">
+                
+                <h1 id="功能模块"><a href="#功能模块" class="headerlink" title="功能模块"></a>功能模块</h1><p>功能截图：</p>
+<img src="/posts/270fbf23/view-history.png" srcset="/img/loading.gif" lazyload class="" title="播放历史功能截图">
+
+<ul>
+<li>变更功能：添加记录、删除记录、清空历史等。</li>
+<li>读取功能：按照时间线返回topN、获取某个视频的观看进度信息等。</li>
+<li>其他功能：暂停&#x2F;回复记录、首次观看某视频触发某逻辑（比如增加经验）。</li>
+</ul>
+<p>特点：观看历史记录类型的业务，是一个极高TPS写入（端上需要定期上报观看进度，比如5s一次）和QPS读取的业务（每次观看视频的时候都要获取该视频的观看进度）。</p>
+<h1 id="架构设计"><a href="#架构设计" class="headerlink" title="架构设计"></a>架构设计</h1><img src="/posts/270fbf23/history-system-design.png" srcset="/img/loading.gif" lazyload class="" title="架构设计">
+
+<div class="note note-info">
+            <p>离线用户在APP本地保留历史记录数据。</p>
+          </div>
+
+<ul>
+<li>BFF：app-interface、history。播放历史BFF层，app-interface服务处理来自外部用户的读请求，依赖其他如稿件服务、漫画服务等来组装完整的面向历史记录业务需要的数据，同时接受来自内部其他服务的写请求，通常都是业务方自己进行业务ID的判定，然后投递到BFF的history服务的写接口中。</li>
+<li>Service：hostory-service，服务层，去除平台业务逻辑的基础服务，专注于历史记录数据的持久化上（因为对于播放类业务，BFF专注于平台业务数据组织，service负责数据的CRUD操作。播放进度是需要高频上报同步的，需要考虑性能优化。）这里采用的是<code>write-back</code>的思路，将数据先同步写入分布式缓存，写异步写回数据库。</li>
+<li>Job：history-job，消费上游生产的Kafka消息，利用消息队列的堆积能力，对于存储层的差速（消费能力跟不上生产速度时），可以进行一定的数据反压（即暂时堆积在Kafka中），配合上游service批量打包过来的数据来进行持久化。</li>
+<li>Upstream：some-app、some-api，整个历史服务还会被一些外部gRPC服务所依赖，这些上游服务使用历史服务的写接口把自己业务的数据进行持久化。</li>
+</ul>
+<p>该历史服务中最重要的设计，就是通过批量打包来聚合数据。将高频、密集的写请求先写入缓存，然后批量消费来减少对存储的直接压力。</p>
+<h2 id="history-service"><a href="#history-service" class="headerlink" title="history-service"></a>history-service</h2><p>该服务专注于处理历史记录的数据。</p>
+<p>写操作的核心逻辑：用户观看的视频、漫画等，带有进度信息的数据，对于同一个用户来说，在一个时间窗口内（比如1分钟），实际上只有最后一次的进度数据是有效的，即<a target="_blank" rel="noopener external nofollow noreferrer" href="https://stackoverflow.com/questions/26890288/what-is-last-write-wins">last write wins</a>，高频的用户端同步逻辑，只需要对最后一次的数据持久化即可。我们可以在服务进程的内存中，定时&#x2F;定量聚合不同用户的同一个对象的最后一个进度（比如在<code>Golang</code>中采用定时器+<code>map</code>实现），然后再投递到Kafka中来进行削峰处理。但同时我们需要保证用户数据可以被实时观察到，不能出现上报进度后，需要等一会才能同步到。所以我们可以在内存中聚合数据后，同时实时写入到<code>Redis</code>中。这样就既保证了实时性，又避免了海量的写入冲击存储。</p>
+<div class="note note-warning">
+            <p>写入到Redis中的数据，不能无限制的存储，需要有截断逻辑（比如超过一定大小后将旧数据删除一部分）。<br>所以Redis中的数据不一定是用户历史记录的完整数据。</p>
+          </div>
+
+<p>数据流：history-service -&gt; 实时写Redis -&gt; history-service进程内存聚合 -&gt; 定时&#x2F;定量写Kafka -&gt; history-job -&gt; DB。</p>
+<img src="/posts/270fbf23/history-service.png" srcset="/img/loading.gif" lazyload class="" title="history-service">
+
+<div class="note note-warning">
+            <p>Kafka是为高吞吐设计的，而高频写入并不是其最擅长的，所以在内存聚合后还需要使用分片算法来将数据打散到多个partition上（比如采用<code>uid%100</code>的算法）。</p>
+          </div>
+
+<p>读操作的核心逻辑：先从Redis读取，如果命中的数据不足，则从存储中读取。这里可以采用cache-aside的模式回写缓存，但不推荐，因为未命中缓存的一般属于比较旧的数据，这种数据对应到用户上属于低频行为。历史记录数据通常是按照时间线来组织，可以使用时间戳作为游标来进行瀑布流加载或者翻页。</p>
+<h1 id="history-job"><a href="#history-job" class="headerlink" title="history-job"></a>history-job</h1><p>职责：从Kafka消费history-service聚合好的用户数据，批量持久化。</p>
+<p>为了节约传输过程中的开销，以及history-service服务进程的内存使用，投递到Kafka的数据只有uid和对应聚合到的观看对象ID列表，以达到最小化Kafka存储和网络传输成本的目的。也正因为如此，所以history-job拿到的数据是不完整的，所以还需要额外从Redis中按照观看对象ID取出对应的数据，再持久化。</p>
+<h1 id="存储设计"><a href="#存储设计" class="headerlink" title="存储设计"></a>存储设计</h1><h2 id="数据库设计"><a href="#数据库设计" class="headerlink" title="数据库设计"></a>数据库设计</h2><p>这里以使用<code>HBase</code>为例：</p>
+<img src="/posts/270fbf23/hbase.png" srcset="/img/loading.gif" lazyload class="" title="数据库设计(HBase)">
+
+<p>数据写入: PUT mid, values，只需要写入到 column_family 的 info 列簇，rowkey 使用用户 id md5 以后的头两位 + 用户，避免 rowkey 热点密集到一个 region 中，导致写&#x2F;读热点。 对于 column_family: info，存储一个列 obj_id + obj_type，例如 稿件业务:1、稿件ID: 100，100_1 作为列名，对于 value 使用 protobuf 序列化一个结构体接入。所以只需要单次更新 kv store。另外我们使用 HBase TTL 的能力，只需要保存90天的用户数据即可。(删除同理)<br>数据读取: 列表获取为 GET mid，直接获取1000条，在内存中排序和翻页。点查 GET mid columns，在茫茫多视频查看当前视频的阅读进度，cache miss 会非常严重，虽然支持点查，但是对于上层 cache miss 后，不再回源请求 HBase。</p>
+<h2 id="缓存设计"><a href="#缓存设计" class="headerlink" title="缓存设计"></a>缓存设计</h2><p>以<code>Redis</code>为例：</p>
+<img src="/posts/270fbf23/redis.png" srcset="/img/loading.gif" lazyload class="" title="缓存设计(Redis)">
+
+<p>数据写入: 每次产生的历史数据，需要立马更新 redis，使用 sorted set 基于时间排序的列表，member 为业务 ID。同时存储一份数据到 redis string 中，使用 protobuf 序列化完整的数据内容。为了避免 redis 中单个用户数据无限增长，需要超过一定量后对数据进行截断。</p>
+<p>数据读取: 分为两个场景，一个是历史页面，这时候使用 sorted set，排序查找即可，拿到列表后，mget 批量获取 history_content 内容。另外一个是点查进度，比如我们点击进入一个视频详情页，这时候直接查找 history_content 进行点查，不再回源 HBase，因为命中率太低（没看过的都查不到记录）。</p>
+<h1 id="可用性设计"><a href="#可用性设计" class="headerlink" title="可用性设计"></a>可用性设计</h1><h2 id="聚合"><a href="#聚合" class="headerlink" title="聚合"></a>聚合</h2><p>经过 BFF history 的流量 per-request 都会发送给 history-service，我们最容易想到的优化就是聚合上移来减少发送给下游的 rpc。但是按照 mid region sharding 的思路非常具有业务的耦合性，所以不应该把逻辑上移，而只是数据上移，所以可以考虑简单 batch put 请求，做一个无逻辑的数据聚合再发送给 history-service，这样可以大大的减少内网的流量，节约资源。</p>
+<p>我们发现经过 API Gateway 的流量都会触发高频的 per-rpc auth，给内网的 identify-service 带来了不少压力。我们认为大部分历史行为通过心跳的方式同步进度，为何不连接一个长连接，长连接服务再握手后先进行用户级的身份验证，之后维持身份信息，而不是每次发送 request 都进行验证，这样可以大大减少内网的 identify-service 的流量。</p>
+<h2 id="广播"><a href="#广播" class="headerlink" title="广播"></a>广播</h2><p>用户首次触发的行为，需要发送消息给下游系统进行触发其他奖励等。如何减少这类一天只用一次的标记位缓存请求？<br>使用 in-process localcache，只有高频的用户访问，带来的收益就越大，我们很容易想到使用 LRU 维护这个集合，但用户分布很广，很难覆盖，命中率很低。</p>
+<p>越源头解决架构问题，通常越简单，效率越高。</p>
+<p>我们在写操作(高频请求)中，把当前的 flag 返回到 API 协议中，作为一个日期值，客户端保存到本地，下次请求的时候带上，如果发现该值在，获取以后直接使用不再请求缓存，例如: 2021-1-1，发现当前时间还是2021-1-1，直接不再请求 redis，如果发现当前时间是2021-1-2，需要触发一次 redis 访问，返回新的 flag 到客户端，这样把状态广播同步到任何其他设备，可以大大减少判定缓存。</p>
+<p>实现成本在于，你认为的代价高低。</p>
+<h1 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h1><ul>
+<li><a target="_blank" rel="noopener external nofollow noreferrer" href="https://u.geekbang.org/lesson/68?article=333628">毛剑-播放历史架构设计</a></li>
+</ul>
+
+                
+              </div>
+            
+            <hr/>
+            <div>
+              <div class="post-metas my-3">
+  
+    <div class="post-meta mr-3 d-flex align-items-center">
+      <i class="iconfont icon-category"></i>
+      
+
+<span class="category-chains">
+  
+  
+    
+      <span class="category-chain">
+        
+  <a href="/categories/%E7%B3%BB%E7%BB%9F%E8%AE%BE%E8%AE%A1/" class="category-chain-item">系统设计</a>
+  
+  
+
+      </span>
+    
+  
+</span>
+
+    </div>
+  
+  
+    <div class="post-meta">
+      <i class="iconfont icon-tags"></i>
+      
+        <a href="/tags/%E7%B3%BB%E7%BB%9F%E8%AE%BE%E8%AE%A1/">#系统设计</a>
+      
+    </div>
+  
+</div>
+
+
+              
+  
+
+  <div class="license-box my-3">
+    <div class="license-title">
+      <div>播放历史架构设计</div>
+      <div>https://whitehole.dev/posts/270fbf23/</div>
+    </div>
+    <div class="license-meta">
+      
+        <div class="license-meta-item">
+          <div>作者</div>
+          <div>always0e0w</div>
+        </div>
+      
+      
+        <div class="license-meta-item license-meta-date">
+          <div>发布于</div>
+          <div>2022年3月18日</div>
+        </div>
+      
+      
+      <div class="license-meta-item">
+        <div>许可协议</div>
+        <div>
+          
+            
+            
+              <a target="_blank" href="https://creativecommons.org/licenses/by/4.0/" rel="external nofollow noreferrer">
+              <span class="hint--top hint--rounded" aria-label="BY - 署名">
+                <i class="iconfont icon-by"></i>
+              </span>
+              </a>
+            
+          
+        </div>
+      </div>
+    </div>
+    <div class="license-icon iconfont"></div>
+  </div>
+
+
+
+              
+                <div class="post-prevnext my-3">
+                  <article class="post-prev col-6">
+                    
+                    
+                  </article>
+                  <article class="post-next col-6">
+                    
+                    
+                      <a href="/posts/5426ec20/" title="评论系统架构设计">
+                        <span class="hidden-mobile">评论系统架构设计</span>
+                        <span class="visible-mobile">下一篇</span>
+                        <i class="iconfont icon-arrowright"></i>
+                      </a>
+                    
+                  </article>
+                </div>
+              
+            </div>
+
+            
+  <article id="comments" lazyload>
+    
+  <div id="waline"></div>
+  <script type="text/javascript">
+    Fluid.utils.loadComments('#waline', function() {
+      Fluid.utils.createCssLink('https://lib.baomitu.com/waline/2.5.1/waline.min.css')
+      Fluid.utils.createScript('https://lib.baomitu.com/waline/2.5.1/waline.min.js', function() {
+        var options = Object.assign(
+          {"serverURL":"https://waline.whitehole.dev/","path":"window.location.pathname","meta":["nick","mail","link"],"requiredMeta":["nick"],"lang":"zh-CN","emoji":["https://cdn.jsdelivr.net/gh/walinejs/emojis@1.0.0/qq","https://cdn.jsdelivr.net/gh/walinejs/emojis@1.0.0/tw-emoji","https://cdn.jsdelivr.net/gh/walinejs/emojis@1.0.0/bilibili","https://cdn.jsdelivr.net/gh/walinejs/emojis@1.0.0/alus","https://cdn.jsdelivr.net/gh/walinejs/emojis@1.0.0/tieba","https://cdn.jsdelivr.net/gh/walinejs/emojis@1.0.0/weibo"],"dark":"html[data-user-color-scheme=\"dark\"]","wordLimit":0,"pageSize":10,"placeholder":"说点什么吧","avatar":"retro","highlight":true,"avatarCDN":"https://gravatar.loli.net/avatar/","avatarForce":false,"requiredFields":[],"emojiCDN":null,"emojiMaps":null,"anonymous":null,"admin":"博主"},
+          {
+            el: '#waline',
+            path: window.location.pathname
+          }
+        )
+        Waline.init(options);
+        Fluid.utils.waitElementVisible('#waline .vcontent', () => {
+          var imgSelector = '#waline .vcontent img:not(.vemoji)';
+          Fluid.plugins.imageCaption(imgSelector);
+          Fluid.plugins.fancyBox(imgSelector);
+        })
+      });
+    });
+  </script>
+  <noscript>Please enable JavaScript to view the comments</noscript>
+
+
+  </article>
+
+
+          </article>
+        </div>
+      </div>
+    </div>
+
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+  <aside class="sidebar" style="margin-left: -1rem">
+    <div id="toc">
+  <p class="toc-header"><i class="iconfont icon-list"></i>&nbsp;目录</p>
+  <div class="toc-body" id="toc-body"></div>
+</div>
+
+
+
+  </aside>
+
+
+    </div>
+  </div>
+</div>
+
+
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+
+
+
+
+    
+
+    
+      <a id="scroll-top-button" aria-label="TOP" href="#" role="button">
+        <i class="iconfont icon-arrowup" aria-hidden="true"></i>
+      </a>
+    
+
+    
+      <div class="modal fade" id="modalSearch" tabindex="-1" role="dialog" aria-labelledby="ModalLabel"
+     aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header text-center">
+        <h4 class="modal-title w-100 font-weight-bold">搜索</h4>
+        <button type="button" id="local-search-close" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body mx-3">
+        <div class="md-form mb-5">
+          <input type="text" id="local-search-input" class="form-control validate">
+          <label data-error="x" data-success="v" for="local-search-input">关键词</label>
+        </div>
+        <div class="list-group" id="local-search-result"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+    
+
+    
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+  
+    <div class="footer-content">
+       <a href="https://hexo.io" target="_blank" rel="nofollow noopener"><span>Hexo</span></a> <i class="iconfont icon-love"></i> <a href="https://github.com/fluid-dev/hexo-theme-fluid" target="_blank" rel="nofollow noopener"><span>Fluid</span></a> <i class="iconfont icon-love"></i> <a href="https://www.upyun.com/?utm_source=lianmeng&utm_medium=referral" target="_blank" rel="external nofollow"><img src="/img/upyun.png" srcset="/img/loading.gif" lazyload class="upyun-logo" /></a> <br>©️2022 <a href="/">whitehole.dev</a>. All rights reserved. 
+    </div>
+  
+  
+    <div class="statistics">
+  
+  
+
+  
+    
+      <span id="leancloud-site-pv-container" style="display: none">
+        总访问量 
+        <span id="leancloud-site-pv"></span>
+         次
+      </span>
+    
+    
+      <span id="leancloud-site-uv-container" style="display: none">
+        总访客数 
+        <span id="leancloud-site-uv"></span>
+         人
+      </span>
+    
+    
+
+  
+</div>
+
+  
+  
+  
+</div>
+
+  </footer>
+
+  <!-- Scripts -->
+  
+  <script  src="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.js" ></script>
+  <link  rel="stylesheet" href="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.css" />
+
+  <script>
+    NProgress.configure({"showSpinner":false,"trickleSpeed":100})
+    NProgress.start()
+    window.addEventListener('load', function() {
+      NProgress.done();
+    })
+  </script>
+
+
+<script  src="https://lib.baomitu.com/jquery/3.6.0/jquery.min.js" ></script>
+<script  src="https://lib.baomitu.com/twitter-bootstrap/4.6.1/js/bootstrap.min.js" ></script>
+<script  src="/js/events.js" ></script>
+<script  src="/js/plugins.js" ></script>
+
+
+  <script  src="https://lib.baomitu.com/typed.js/2.0.12/typed.min.js" ></script>
+  <script>
+    (function (window, document) {
+      var typing = Fluid.plugins.typing;
+      var subtitle = document.getElementById('subtitle');
+      if (!subtitle || !typing) {
+        return;
+      }
+      var text = subtitle.getAttribute('data-typed-text');
+      
+        typing(text);
+      
+    })(window, document);
+  </script>
+
+
+
+
+  
+    <script  src="/js/img-lazyload.js" ></script>
+  
+
+
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/tocbot/4.18.2/tocbot.min.js', function() {
+    var toc = jQuery('#toc');
+    if (toc.length === 0 || !window.tocbot) { return; }
+    var boardCtn = jQuery('#board-ctn');
+    var boardTop = boardCtn.offset().top;
+
+    window.tocbot.init({
+      tocSelector     : '#toc-body',
+      contentSelector : '.markdown-body',
+      headingSelector : CONFIG.toc.headingSelector || 'h1,h2,h3,h4,h5,h6',
+      linkClass       : 'tocbot-link',
+      activeLinkClass : 'tocbot-active-link',
+      listClass       : 'tocbot-list',
+      isCollapsedClass: 'tocbot-is-collapsed',
+      collapsibleClass: 'tocbot-is-collapsible',
+      collapseDepth   : CONFIG.toc.collapseDepth || 0,
+      scrollSmooth    : true,
+      headingsOffset  : -boardTop
+    });
+    if (toc.find('.toc-list-item').length > 0) {
+      toc.css('visibility', 'visible');
+    }
+  });
+</script>
+
+
+  <script src=https://lib.baomitu.com/clipboard.js/2.0.10/clipboard.min.js></script>
+
+  <script>Fluid.plugins.codeWidget();</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/anchor-js/4.3.1/anchor.min.js', function() {
+    window.anchors.options = {
+      placement: CONFIG.anchorjs.placement,
+      visible  : CONFIG.anchorjs.visible
+    };
+    if (CONFIG.anchorjs.icon) {
+      window.anchors.options.icon = CONFIG.anchorjs.icon;
+    }
+    var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+    var res = [];
+    for (var item of el) {
+      res.push('.markdown-body > ' + item.trim());
+    }
+    if (CONFIG.anchorjs.placement === 'left') {
+      window.anchors.options.class = 'anchorjs-link-left';
+    }
+    window.anchors.add(res.join(', '));
+  });
+</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.js', function() {
+    Fluid.plugins.fancyBox();
+  });
+</script>
+
+
+  <script>Fluid.plugins.imageCaption();</script>
+
+  <script defer src="/js/leancloud.js" ></script>
+
+  <script  src="/js/local-search.js" ></script>
+
+
+
+
+
+<!-- 主题的启动项，将它保持在最底部 -->
+<!-- the boot of the theme, keep it at the bottom -->
+<script  src="/js/boot.js" ></script>
+
+
+  
+
+  <noscript>
+    <div class="noscript-warning">博客在允许 JavaScript 运行的环境下浏览效果更佳</div>
+  </noscript>
+<script>(function (w, d, s, id) {
+            if (typeof (w.webpushr) !== 'undefined') return; w.webpushr = w.webpushr || function () { (w.webpushr.q = w.webpushr.q || []).push(arguments) }; var js, fjs = d.getElementsByTagName(s)[0]; js = d.createElement(s); js.id = id; js.async = 1; js.src = "https://cdn.webpushr.com/app.min.js";fjs.parentNode.appendChild(js);}(window, document, 'script', 'webpushr-jssdk'));webpushr('setup', { 'key': 'BC7dn5_FpwuUPNgf04uAMGTyoREL8CvqMiaMQWlEqN40sED6j8haOxAoq12xuuqXDSwUz-ImS9kgroqsHrf9nok' });</script></body>
+</html>

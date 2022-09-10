@@ -1,0 +1,850 @@
+
+
+<!DOCTYPE html>
+<html lang="zh-CN" data-default-color-scheme=auto>
+
+
+
+<head><!-- hexo injector head_begin start --><script>
+(function(){
+    var bp = document.createElement('script');
+    var curProtocol = window.location.protocol.split(':')[0];
+    if (curProtocol === 'https') {
+        bp.src = 'https://zz.bdstatic.com/linksubmit/push.js';        
+    }
+    else {
+        bp.src = 'http://push.zhanzhang.baidu.com/push.js';
+    }
+    var s = document.getElementsByTagName("script")[0];
+    s.parentNode.insertBefore(bp, s);
+})();
+</script>
+<!-- hexo injector head_begin end -->
+  <meta charset="UTF-8">
+  <link rel="apple-touch-icon" sizes="76x76" href="/img/apple-icon.png">
+  <link rel="icon" href="/img/favicon.ico">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, shrink-to-fit=no">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  
+    <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
+  
+  <meta name="theme-color" content="#2f4154">
+  <meta name="author" content="always0e0w">
+  <meta name="keywords" content="Hexo,Go,Golang,LeetCode,博客,后端">
+  
+    <meta name="description" content="功能模块  架构设计最重要的就是理解整个产品体系在系统中的定位。搞清楚系统背后的背景，才能做出最佳的设计和抽象。不要做需求的翻译机，先理解业务背后的本质，事情的初衷。 评论系统，我们往小里做就是视频评论系统，往大里做就是评论平台，可以接入各种业务形态。 需求功能点：  发布评论: 支持回复楼层、楼中楼。 读取评论: 按照时间、热度排序。 删除评论: 用户自己删除、楼主&#x2F;管理员删除。 管理">
+<meta property="og:type" content="article">
+<meta property="og:title" content="评论系统架构设计">
+<meta property="og:url" content="https://whitehole.dev/posts/5426ec20/index.html">
+<meta property="og:site_name" content="white hole">
+<meta property="og:description" content="功能模块  架构设计最重要的就是理解整个产品体系在系统中的定位。搞清楚系统背后的背景，才能做出最佳的设计和抽象。不要做需求的翻译机，先理解业务背后的本质，事情的初衷。 评论系统，我们往小里做就是视频评论系统，往大里做就是评论平台，可以接入各种业务形态。 需求功能点：  发布评论: 支持回复楼层、楼中楼。 读取评论: 按照时间、热度排序。 删除评论: 用户自己删除、楼主&#x2F;管理员删除。 管理">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://whitehole.dev/posts/5426ec20/comments.jpg">
+<meta property="og:image" content="https://whitehole.dev/posts/5426ec20/comment-system-arch.png">
+<meta property="og:image" content="https://whitehole.dev/posts/5426ec20/comment-read.png">
+<meta property="og:image" content="https://whitehole.dev/posts/5426ec20/mysql2es.png">
+<meta property="og:image" content="https://whitehole.dev/posts/5426ec20/dbtable.png">
+<meta property="og:image" content="https://whitehole.dev/posts/5426ec20/cache.png">
+<meta property="og:image" content="https://whitehole.dev/posts/5426ec20/circular-array.png">
+<meta property="article:published_time" content="2022-03-15T09:11:48.000Z">
+<meta property="article:modified_time" content="2022-09-10T00:45:26.827Z">
+<meta property="article:author" content="always0e0w">
+<meta property="article:tag" content="Hexo,Go,Golang,LeetCode,博客,后端">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://whitehole.dev/posts/5426ec20/comments.jpg">
+  
+  
+  
+  <title>评论系统架构设计 - white hole</title>
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/twitter-bootstrap/4.6.1/css/bootstrap.min.css" />
+
+
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/github-markdown-css/4.0.0/github-markdown.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/hint.css/2.7.0/hint.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.css" />
+
+
+
+<!-- 主题依赖的图标库，不要自行修改 -->
+<!-- Do not modify the link that theme dependent icons -->
+
+<link rel="stylesheet" href="//at.alicdn.com/t/font_1749284_hj8rtnfg7um.css">
+
+
+
+<link rel="stylesheet" href="https://at.alicdn.com/t/font_1736178_kmeydafke9r.css">
+
+
+<link  rel="stylesheet" href="/css/main.css" />
+
+
+  <link id="highlight-css" rel="stylesheet" href="/css/highlight.css" />
+  
+    <link id="highlight-css-dark" rel="stylesheet" href="/css/highlight-dark.css" />
+  
+
+
+
+  
+<link rel="stylesheet" href="/css/custom.css">
+
+
+
+  <script id="fluid-configs">
+    var Fluid = window.Fluid || {};
+    Fluid.ctx = Object.assign({}, Fluid.ctx)
+    var CONFIG = {"hostname":"whitehole.dev","root":"/","version":"1.9.2","typing":{"enable":true,"typeSpeed":70,"cursorChar":"_","loop":false,"scope":[]},"anchorjs":{"enable":true,"element":"h1,h2,h3,h4,h5,h6","placement":"left","visible":"hover","icon":""},"progressbar":{"enable":true,"height_px":3,"color":"#29d","options":{"showSpinner":false,"trickleSpeed":100}},"code_language":{"enable":true,"default":"TEXT"},"copy_btn":true,"image_caption":{"enable":true},"image_zoom":{"enable":true,"img_url_replace":["",""]},"toc":{"enable":true,"placement":"right","headingSelector":"h1,h2,h3,h4,h5,h6","collapseDepth":0},"lazyload":{"enable":true,"loading_img":"/img/loading.gif","onlypost":false,"offset_factor":2},"web_analytics":{"enable":true,"follow_dnt":true,"baidu":null,"google":null,"gtag":null,"tencent":{"sid":null,"cid":null},"woyaola":null,"cnzz":null,"leancloud":{"app_id":"D1eRICWLjdh1OSlCnSIuaEjf-MdYXbMMI","app_key":"2d8uXdo4Rk8dWcd1ao7fSjkp","server_url":null,"path":"window.location.pathname","ignore_local":false}},"search_path":"/local-search.xml"};
+
+    if (CONFIG.web_analytics.follow_dnt) {
+      var dntVal = navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack;
+      Fluid.ctx.dnt = dntVal && (dntVal.startsWith('1') || dntVal.startsWith('yes') || dntVal.startsWith('on'));
+    }
+  </script>
+  <script  src="/js/utils.js" ></script>
+  <script  src="/js/color-schema.js" ></script>
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+  
+
+
+
+  
+<meta name="generator" content="Hexo 6.3.0"></head>
+
+
+<body>
+  
+
+  <header>
+    
+
+<div class="header-inner" style="height: 70vh;">
+  <nav id="navbar" class="navbar fixed-top  navbar-expand-lg navbar-dark scrolling-navbar">
+  <div class="container">
+    <a class="navbar-brand" href="/">
+      <strong>white hole</strong>
+    </a>
+
+    <button id="navbar-toggler-btn" class="navbar-toggler" type="button" data-toggle="collapse"
+            data-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <div class="animated-icon"><span></span><span></span><span></span></div>
+    </button>
+
+    <!-- Collapsible content -->
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav ml-auto text-center">
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/">
+                <i class="iconfont icon-home-fill"></i>
+                首页
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/archives/">
+                <i class="iconfont icon-archive-fill"></i>
+                归档
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/categories/">
+                <i class="iconfont icon-category-fill"></i>
+                分类
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/tags/">
+                <i class="iconfont icon-tags-fill"></i>
+                标签
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle" target="_self" href="javascript:;" role="button"
+                 data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                
+                更多
+              </a>
+              <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+                
+                  
+                  
+                  
+                  <a class="dropdown-item" href="/about/">
+                    <i class="iconfont icon-user-fill"></i>
+                    关于
+                  </a>
+                
+                  
+                  
+                  
+                  <a class="dropdown-item" target="_blank" rel="noopener external nofollow noreferrer" href="https://status.whitehole.dev/">
+                    
+                    Uptime
+                  </a>
+                
+                  
+                  
+                  
+                  <a class="dropdown-item" target="_blank" rel="noopener external nofollow noreferrer" href="https://pan.whitehole.dev/">
+                    
+                    OneDrive
+                  </a>
+                
+              </div>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/links/">
+                <i class="iconfont icon-link-fill"></i>
+                友链
+              </a>
+            </li>
+          
+        
+        
+          <li class="nav-item" id="search-btn">
+            <a class="nav-link" target="_self" href="javascript:;" rel="external nofollow noreferrer" data-toggle="modal" data-target="#modalSearch" aria-label="Search">
+              &nbsp;<i class="iconfont icon-search"></i>&nbsp;
+            </a>
+          </li>
+          
+        
+        
+          <li class="nav-item" id="color-toggle-btn">
+            <a class="nav-link" target="_self" href="javascript:;" rel="external nofollow noreferrer" aria-label="Color Toggle">&nbsp;<i
+                class="iconfont icon-dark" id="color-toggle-icon"></i>&nbsp;</a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</nav>
+
+  
+
+<div id="banner" class="banner" parallax=true
+     style="background: url('https://tuapi.eees.cc/api.php?category=fengjing&type=302') no-repeat center center; background-size: cover;">
+  <div class="full-bg-img">
+    <div class="mask flex-center" style="background-color: rgba(0, 0, 0, 0.3)">
+      <div class="banner-text text-center fade-in-up">
+        <div class="h2">
+          
+            <span id="subtitle" data-typed-text="评论系统架构设计"></span>
+          
+        </div>
+
+        
+          
+  <div class="mt-3">
+    
+    
+      <span class="post-meta">
+        <i class="iconfont icon-date-fill" aria-hidden="true"></i>
+        <time datetime="2022-03-15 17:11" pubdate>
+          2022年3月15日 下午
+        </time>
+      </span>
+    
+  </div>
+
+  <div class="mt-1">
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-chart"></i>
+        
+          <!-- compatible with older versions-->
+          4.2k 字
+        
+      </span>
+    
+
+    
+
+    
+    
+      
+        <span id="leancloud-page-views-container" class="post-meta" style="display: none">
+          <i class="iconfont icon-eye" aria-hidden="true"></i>
+          <span id="leancloud-page-views"></span> 次
+        </span>
+        
+      
+    
+  </div>
+
+
+        
+      </div>
+
+      
+    </div>
+  </div>
+</div>
+
+</div>
+
+  </header>
+
+  <main>
+    
+      
+
+<div class="container-fluid nopadding-x">
+  <div class="row nomargin-x">
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+
+    </div>
+
+    <div class="col-lg-8 nopadding-x-md">
+      <div class="container nopadding-x-md" id="board-ctn">
+        <div id="board">
+          <article class="post-content mx-auto">
+            <!-- SEO header -->
+            <h1 style="display: none">评论系统架构设计</h1>
+            
+              <p class="note note-info">
+                
+                  
+                    <!-- compatible with older versions-->
+                    本文最后更新于：2022年9月10日 早上
+                  
+                
+              </p>
+            
+            
+              <div class="markdown-body">
+                
+                <h1 id="功能模块"><a href="#功能模块" class="headerlink" title="功能模块"></a>功能模块</h1><img src="/posts/5426ec20/comments.jpg" srcset="/img/loading.gif" lazyload class="" title="评论功能示例">
+
+<p>架构设计最重要的就是理解整个产品体系在系统中的定位。搞清楚系统背后的背景，才能做出最佳的设计和抽象。不要做需求的翻译机，先理解业务背后的本质，事情的初衷。</p>
+<p>评论系统，我们往小里做就是视频评论系统，往大里做就是评论平台，可以接入各种业务形态。</p>
+<p>需求功能点：</p>
+<ul>
+<li>发布评论: 支持回复楼层、楼中楼。</li>
+<li>读取评论: 按照时间、热度排序。</li>
+<li>删除评论: 用户自己删除、楼主&#x2F;管理员删除。</li>
+<li>管理评论: 作者置顶、后台运营管理(搜索、删除、审核等)。</li>
+</ul>
+<p><strong>在动手设计前，反复思考，真正编码的时间只有5%。</strong></p>
+<h1 id="架构设计"><a href="#架构设计" class="headerlink" title="架构设计"></a>架构设计</h1><img src="/posts/5426ec20/comment-system-arch.png" srcset="/img/loading.gif" lazyload class="" title="架构设计">
+
+<p>模块说明：</p>
+<ul>
+<li>comment: 负责对复杂的评论业务进行服务编排（比如访问账号服务进行等级判断），同时在<code>BFF</code>层面向移动端或web场景来设计API。通过这一层的抽象把评论本身的内容列表处理（加载、分页、排序等）进行了隔离，关注在业务平台化逻辑上。</li>
+<li>comment-service: 服务层，去平台业务的逻辑，专注在评论功能的API实现上，比如发布评论、读取评论、删除评论等，关注在稳定性、可用性上，从而让上游可以灵活的组织逻辑把基础能力和业务能力剥离。</li>
+<li>comment-job: 利用消息队列进行流量削峰。当遇到密集写的场景时，服务的瓶颈大概率发生在有状态的一层（比如DB），所以在此场景下可以使用消息队列（比如Kafka）的堆积能力进行流量削峰。但是要注意，这种方式会导致用户看到的数据可能会有延迟，严格的实时场景需要另寻他法。</li>
+<li>comment-admin: 评论管理平台，按照安全等级划分服务，尤其要对运营平台进行划分，它们会共享服务层的存储（MySQL、Redis）。运营体系的数据大多都是检索，我们可以使用<code>[canal](https://github.com/alibaba/canal)</code>同步到<code>ES</code>中，从而使用<code>ES</code>独立作为运营平台的数据源，这样运营平台的查询压力就下放给了独立的<code>fulltext search</code>系统（即<code>ES</code>）。</li>
+<li>account-service &amp; filter-service: 整个评论服务还会依赖一些外部的<code>gRPC</code>服务，统一的平台业务逻辑在<code>comment BFF</code>层收敛。<code>account-service</code>和<code>filter-service</code>就是其外部依赖的账号服务和敏感词过滤服务。</li>
+</ul>
+<p>回源：当comment-service读取未命中缓存时，先从DB捞所需数据，然后生产一条cache rebuild的指令到消息队列，再由消息队列的消费端job进行缓存回填。</p>
+<p>流量路径：请求 -&gt; API网关(如envoy) -&gt; BFF(服务编排) -&gt; 账号服务&amp;敏感词过滤等BFF的第三方依赖 -&gt; comment-service -&gt; 消息队列 -&gt; comment-job -&gt; 存储</p>
+<div class="note note-info">
+            <p>架构设计应该简单而不简约。<br>架构设计等同于数据设计，梳理清楚数据的走向和逻辑，尽量避免环形依赖、数据双向请求等。—— by 毛剑</p>
+          </div>
+
+<h2 id="comment-service"><a href="#comment-service" class="headerlink" title="comment-service"></a>comment-service</h2><p>专注于评论数据的处理。</p>
+<p>如果comment-service和comment服务在同一层，那么业务将和评论的基础功能耦合在一起实现，后续将非常不利于迭代，并且在业务功能迭代的过程中可能会导致评论的基础功能出现问题。</p>
+<p>读的核心逻辑：使用Cache-Aside模式，先读取缓存，缓存未命中时再读取存储。对于缓存重建逻辑，比较直接的做法是使用 read ahead 的思路，即预读，当用户访问第一页的时候，我们假定用户大概率会访问第二页，所以缓存会提前加载一部分，避免频繁触发cache miss。但是当缓存抖动时，这种方式特别容易引起<code>MySQL</code>集群的<a target="_blank" rel="noopener external nofollow noreferrer" href="https://zh.wikipedia.org/wiki/%E6%83%8A%E7%BE%A4%E9%97%AE%E9%A2%98">thundering herd</a>现象，从而导致触发大量cache rebuild，再加上使用了read ahead的预加载模式，就很容易导致业务服务OOM（因为业务服务的内存中会突然增加大量从DB读取到的数据）。所以这里的架构中使用了回源的逻辑，使用消息队列将逻辑进行异步化的处理，对于当前请求只返回<code>MySQL</code>中的部分数据即可。</p>
+<p>写的核心逻辑：当类似”明星出轨“等热点事件发生时，写和读相比较，写操作可以认为是透传到存储层的，系统的瓶颈往往也是在存储层（或有状态层）。对于写操作的设计，我们可以认为刚发布的评论有极短的延迟（毫秒级）对于用户来说是可接受的，所以可以把对存储的直接冲击下放到消息队列，按照消息反压的思路，即如果存储latency升高，消费能力就下降，自然消息容易堆积，以此来保证系统始终以最大能力消费。</p>
+<p>对于消费到的消息如何保证顺序的问题，以消息队列使用<code>Kafka</code>为例，<code>Kafka</code>有<code>partition</code>的概念，一个<code>topic</code>由一组<code>partition</code>组成，所以<code>Kafka</code>的吞吐模型理解为”全局并行、局部串行“的生产消费模式。因此对于入队的消息，可以按照<code>hash(评论所属主题的ID)%partition个数</code>的方式进行分发，将某个主题的所有评论全部丢到一个统一的<code>partition</code>中进行处理，就可以保证评论的顺序了。（同样的，回源消息也是类似的思路）</p>
+<div class="note note-danger">
+            <p>思考：如果<code>partition</code>的个数中途变了怎么办？</p>
+          </div>
+
+<img src="/posts/5426ec20/comment-read.png" srcset="/img/loading.gif" lazyload class="" title="读&amp;写评论的逻辑">
+
+<h2 id="comment-admin"><a href="#comment-admin" class="headerlink" title="comment-admin"></a>comment-admin</h2><img src="/posts/5426ec20/mysql2es.png" srcset="/img/loading.gif" lazyload class="" title="mysql -&gt; es">
+
+<p><code>MySQL</code>的<code>binlog</code>数据被<code>canal</code>中间件流式消费，获取到业务的原始CRUD操作，通过回放录入到<code>ES</code>中。但是<code>ES</code>中的数据最终是面向运营体系提供服务能力的，需要检索的数据维度比较多，所以在入<code>ES</code>之前需要做一个异构的<code>Joiner</code>，把单表变宽预处理好join逻辑，然后再导入<code>ES</code>中。</p>
+<p>一般来说，运营后台的检索条件都是组合使用的，使用<code>ES</code>的好处是可以避免依赖<code>MySQL</code>来做多条件检索，同时<code>MySQL</code>毕竟是<code>OLTP</code>面向线上联机事务处理的。通过冗余数据的方式，使用其他引擎来实现。</p>
+<h2 id="comment"><a href="#comment" class="headerlink" title="comment"></a>comment</h2>
+
+<p>comment服务作为BFF，是面向端、面向平台、面向业务组合的服务。所以平台扩展的能力，我们都在comment服务来实现，以统一的接口形式提供平台化的能力。</p>
+<ul>
+<li>依赖其他gRPC服务，整合统一平台侧的逻辑（比如发布评论时对用户等级的判定）</li>
+<li>直接向端上提供接口，提供数据的读写接口，甚至可以整合端上，提供统一的端上SDK</li>
+<li>需要对非核心依赖的gRPC服务进行降级</li>
+</ul>
+<h1 id="存储设计"><a href="#存储设计" class="headerlink" title="存储设计"></a>存储设计</h1><h2 id="数据库设计"><a href="#数据库设计" class="headerlink" title="数据库设计"></a>数据库设计</h2><p>表结构：</p>
+<img src="/posts/5426ec20/dbtable.png" srcset="/img/loading.gif" lazyload class="" title="数据库表">
+
+<ul>
+<li>comment_subject_n：主题（评论所属的实体）表</li>
+<li>comment_content_m：评论内容表，包含评论的实际内容</li>
+<li>comment_index_k：评论楼层的索引组织表，不包含评论的实际内容</li>
+</ul>
+<p>comment_content表中的comment_id与comment_index中的id字段是一一对应的关系，这里面包含的设计思想：</p>
+<ul>
+<li>MySQL的表都有主键，是物理组织形式存放的，comment_content表没有使用自增id作为主键，是为了通过comment_id查询评论内容时减少一次回表操作，直接使用comment_id作为主键查找可以直接查询到评论对应的信息。</li>
+<li>索引、内容分离，方便<code>MySQL</code>的<code>data page</code>缓存更多行数据，如果和content耦合，可能会导致更大的IO。长远来看，content的信息可以使用<code>K/V</code>类型的存储。</li>
+</ul>
+<p>数据写入：在同一个事务中更新comment_subject、comment_index、comment_content三张表，其中comment_content属于非强一致性考虑的。也可以先写入comment_content，再在另一个事务中更新其他的表(comment_subject-&gt;comment_index)。即便comment_content先成功，后续其他表更新失败也不过是多存在一条ghost数据而已。</p>
+<p>数据读取：基于<code>obj_id</code>和<code>obj_type</code>在<code>comment_index</code>中找到评论列表（ <code>WHERE root=0 ORDER BY floor</code>）。然后再根据<code>comment_index</code>的<code>id</code>字段从<code>comment_content</code>中将评论的内容获取到。</p>
+<p>这里假设产品形态只支持二级列表（即对评论的回复只有两级：主评论和二级评论，不能无限嵌套，如图1），因此只需要迭代查询两次即可。对于嵌套层次多的产品形态，可以通过二次点击支持。</p>
+<div class="note note-info">
+            <p>思考：是否可以用Graph存储？DGraph、HugeGraph类似的图存储思路。</p>
+          </div>
+
+<h2 id="缓存设计"><a href="#缓存设计" class="headerlink" title="缓存设计"></a>缓存设计</h2><p>基于Redis的设计：</p>
+<img src="/posts/5426ec20/cache.png" srcset="/img/loading.gif" lazyload class="" title="缓存设计">
+
+<ul>
+<li>comment_subject_cache：主题的缓存，value使用<code>protobuf</code>序列化的方式存入（比json序列化的体积要小）。</li>
+<li>comment_index_cache：使用Redis的sorted set来缓存评论索引。</li>
+<li>comment_content_cache：缓存评论内容。</li>
+</ul>
+<h1 id="可用性设计"><a href="#可用性设计" class="headerlink" title="可用性设计"></a>可用性设计</h1><h2 id="Singleflight"><a href="#Singleflight" class="headerlink" title="Singleflight"></a>Singleflight</h2><p>对于热门的主题，如果存在缓存穿透的情况，会导致大量的同进程、跨进程的数据回源到存储层，可能会引起存储过载的情况，如何只交给同进程内，一个人去做加载存储?</p>
+<p>使用归并回源的思路：<a target="_blank" rel="noopener external nofollow noreferrer" href="https://pkg.go.dev/golang.org/x/sync/singleflight">https://pkg.go.dev/golang.org/x/sync/singleflight</a></p>
+<p>同进程只交给一个人去获取<code>MySQL</code>数据，然后批量返回。同时这个 lease owner 投递一个 kafka 消息，做 index cache 的 recovery 操作。这样可以大大减少<code>MySQL</code>的压力，以及大量透穿导致的密集写 kafka 的问题。</p>
+<p>更进一步的，后续连续的请求，仍然可能会短时 cache miss，我们可以在进程内设置一个 short-lived flag，标记最近有一个人投递了 cache rebuild 的消息，直接 drop。</p>
+<div class="note note-info">
+            <p>思考：这里不建议使用分布式锁，可以思考下为什么。</p>
+          </div>
+
+<h2 id="热点"><a href="#热点" class="headerlink" title="热点"></a>热点</h2><p>流量热点是因为突然热门的主题，被高频次的访问，因为底层的 cache 设计，一般是按照主题 key 进行一致性 hash 来进行分片，但是热点 key 一定命中某一个节点，这时候 remote cache 可能会变为瓶颈，因此将  remote cache 升级为 local cache 是有必要的，我们一般使用单进程自适应发现热点的思路，附加一个短时的 ttl local cache，就可以在进程内吞掉大量的读请求。</p>
+<p>可以在内存中使用 hashmap 统计每个 key 的访问频次（注意控制map的大小，避免OOM），这里可以使用滑动窗口统计，即每个窗口中，维护一个 hashmap，之后统计所有未过期的 bucket，汇总所有 key 的数据。</p>
+<p>之后使用小堆计算 TopK 的数据，自动进行热点识别。</p>
+<img src="/posts/5426ec20/circular-array.png" srcset="/img/loading.gif" lazyload class="" title="环形数组">
+
+<h1 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h1><p><a target="_blank" rel="noopener external nofollow noreferrer" href="https://u.geekbang.org/lesson/68?article=323030">Go进阶训练营 - 评论系统架构设计</a></p>
+
+                
+              </div>
+            
+            <hr/>
+            <div>
+              <div class="post-metas my-3">
+  
+    <div class="post-meta mr-3 d-flex align-items-center">
+      <i class="iconfont icon-category"></i>
+      
+
+<span class="category-chains">
+  
+  
+    
+      <span class="category-chain">
+        
+  <a href="/categories/%E7%B3%BB%E7%BB%9F%E8%AE%BE%E8%AE%A1/" class="category-chain-item">系统设计</a>
+  
+  
+
+      </span>
+    
+  
+</span>
+
+    </div>
+  
+  
+</div>
+
+
+              
+  
+
+  <div class="license-box my-3">
+    <div class="license-title">
+      <div>评论系统架构设计</div>
+      <div>https://whitehole.dev/posts/5426ec20/</div>
+    </div>
+    <div class="license-meta">
+      
+        <div class="license-meta-item">
+          <div>作者</div>
+          <div>always0e0w</div>
+        </div>
+      
+      
+        <div class="license-meta-item license-meta-date">
+          <div>发布于</div>
+          <div>2022年3月15日</div>
+        </div>
+      
+      
+      <div class="license-meta-item">
+        <div>许可协议</div>
+        <div>
+          
+            
+            
+              <a target="_blank" href="https://creativecommons.org/licenses/by/4.0/" rel="external nofollow noreferrer">
+              <span class="hint--top hint--rounded" aria-label="BY - 署名">
+                <i class="iconfont icon-by"></i>
+              </span>
+              </a>
+            
+          
+        </div>
+      </div>
+    </div>
+    <div class="license-icon iconfont"></div>
+  </div>
+
+
+
+              
+                <div class="post-prevnext my-3">
+                  <article class="post-prev col-6">
+                    
+                    
+                      <a href="/posts/270fbf23/" title="播放历史架构设计">
+                        <i class="iconfont icon-arrowleft"></i>
+                        <span class="hidden-mobile">播放历史架构设计</span>
+                        <span class="visible-mobile">上一篇</span>
+                      </a>
+                    
+                  </article>
+                  <article class="post-next col-6">
+                    
+                    
+                      <a href="/posts/dca1779e/" title="GORM">
+                        <span class="hidden-mobile">GORM</span>
+                        <span class="visible-mobile">下一篇</span>
+                        <i class="iconfont icon-arrowright"></i>
+                      </a>
+                    
+                  </article>
+                </div>
+              
+            </div>
+
+            
+  <article id="comments" lazyload>
+    
+  <div id="waline"></div>
+  <script type="text/javascript">
+    Fluid.utils.loadComments('#waline', function() {
+      Fluid.utils.createCssLink('https://lib.baomitu.com/waline/2.5.1/waline.min.css')
+      Fluid.utils.createScript('https://lib.baomitu.com/waline/2.5.1/waline.min.js', function() {
+        var options = Object.assign(
+          {"serverURL":"https://waline.whitehole.dev/","path":"window.location.pathname","meta":["nick","mail","link"],"requiredMeta":["nick"],"lang":"zh-CN","emoji":["https://cdn.jsdelivr.net/gh/walinejs/emojis@1.0.0/qq","https://cdn.jsdelivr.net/gh/walinejs/emojis@1.0.0/tw-emoji","https://cdn.jsdelivr.net/gh/walinejs/emojis@1.0.0/bilibili","https://cdn.jsdelivr.net/gh/walinejs/emojis@1.0.0/alus","https://cdn.jsdelivr.net/gh/walinejs/emojis@1.0.0/tieba","https://cdn.jsdelivr.net/gh/walinejs/emojis@1.0.0/weibo"],"dark":"html[data-user-color-scheme=\"dark\"]","wordLimit":0,"pageSize":10,"placeholder":"说点什么吧","avatar":"retro","highlight":true,"avatarCDN":"https://gravatar.loli.net/avatar/","avatarForce":false,"requiredFields":[],"emojiCDN":null,"emojiMaps":null,"anonymous":null,"admin":"博主"},
+          {
+            el: '#waline',
+            path: window.location.pathname
+          }
+        )
+        Waline.init(options);
+        Fluid.utils.waitElementVisible('#waline .vcontent', () => {
+          var imgSelector = '#waline .vcontent img:not(.vemoji)';
+          Fluid.plugins.imageCaption(imgSelector);
+          Fluid.plugins.fancyBox(imgSelector);
+        })
+      });
+    });
+  </script>
+  <noscript>Please enable JavaScript to view the comments</noscript>
+
+
+  </article>
+
+
+          </article>
+        </div>
+      </div>
+    </div>
+
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+  <aside class="sidebar" style="margin-left: -1rem">
+    <div id="toc">
+  <p class="toc-header"><i class="iconfont icon-list"></i>&nbsp;目录</p>
+  <div class="toc-body" id="toc-body"></div>
+</div>
+
+
+
+  </aside>
+
+
+    </div>
+  </div>
+</div>
+
+
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+
+
+
+
+    
+
+    
+      <a id="scroll-top-button" aria-label="TOP" href="#" role="button">
+        <i class="iconfont icon-arrowup" aria-hidden="true"></i>
+      </a>
+    
+
+    
+      <div class="modal fade" id="modalSearch" tabindex="-1" role="dialog" aria-labelledby="ModalLabel"
+     aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header text-center">
+        <h4 class="modal-title w-100 font-weight-bold">搜索</h4>
+        <button type="button" id="local-search-close" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body mx-3">
+        <div class="md-form mb-5">
+          <input type="text" id="local-search-input" class="form-control validate">
+          <label data-error="x" data-success="v" for="local-search-input">关键词</label>
+        </div>
+        <div class="list-group" id="local-search-result"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+    
+
+    
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+  
+    <div class="footer-content">
+       <a href="https://hexo.io" target="_blank" rel="nofollow noopener"><span>Hexo</span></a> <i class="iconfont icon-love"></i> <a href="https://github.com/fluid-dev/hexo-theme-fluid" target="_blank" rel="nofollow noopener"><span>Fluid</span></a> <i class="iconfont icon-love"></i> <a href="https://www.upyun.com/?utm_source=lianmeng&utm_medium=referral" target="_blank" rel="external nofollow"><img src="/img/upyun.png" srcset="/img/loading.gif" lazyload class="upyun-logo" /></a> <br>©️2022 <a href="/">whitehole.dev</a>. All rights reserved. 
+    </div>
+  
+  
+    <div class="statistics">
+  
+  
+
+  
+    
+      <span id="leancloud-site-pv-container" style="display: none">
+        总访问量 
+        <span id="leancloud-site-pv"></span>
+         次
+      </span>
+    
+    
+      <span id="leancloud-site-uv-container" style="display: none">
+        总访客数 
+        <span id="leancloud-site-uv"></span>
+         人
+      </span>
+    
+    
+
+  
+</div>
+
+  
+  
+  
+</div>
+
+  </footer>
+
+  <!-- Scripts -->
+  
+  <script  src="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.js" ></script>
+  <link  rel="stylesheet" href="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.css" />
+
+  <script>
+    NProgress.configure({"showSpinner":false,"trickleSpeed":100})
+    NProgress.start()
+    window.addEventListener('load', function() {
+      NProgress.done();
+    })
+  </script>
+
+
+<script  src="https://lib.baomitu.com/jquery/3.6.0/jquery.min.js" ></script>
+<script  src="https://lib.baomitu.com/twitter-bootstrap/4.6.1/js/bootstrap.min.js" ></script>
+<script  src="/js/events.js" ></script>
+<script  src="/js/plugins.js" ></script>
+
+
+  <script  src="https://lib.baomitu.com/typed.js/2.0.12/typed.min.js" ></script>
+  <script>
+    (function (window, document) {
+      var typing = Fluid.plugins.typing;
+      var subtitle = document.getElementById('subtitle');
+      if (!subtitle || !typing) {
+        return;
+      }
+      var text = subtitle.getAttribute('data-typed-text');
+      
+        typing(text);
+      
+    })(window, document);
+  </script>
+
+
+
+
+  
+    <script  src="/js/img-lazyload.js" ></script>
+  
+
+
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/tocbot/4.18.2/tocbot.min.js', function() {
+    var toc = jQuery('#toc');
+    if (toc.length === 0 || !window.tocbot) { return; }
+    var boardCtn = jQuery('#board-ctn');
+    var boardTop = boardCtn.offset().top;
+
+    window.tocbot.init({
+      tocSelector     : '#toc-body',
+      contentSelector : '.markdown-body',
+      headingSelector : CONFIG.toc.headingSelector || 'h1,h2,h3,h4,h5,h6',
+      linkClass       : 'tocbot-link',
+      activeLinkClass : 'tocbot-active-link',
+      listClass       : 'tocbot-list',
+      isCollapsedClass: 'tocbot-is-collapsed',
+      collapsibleClass: 'tocbot-is-collapsible',
+      collapseDepth   : CONFIG.toc.collapseDepth || 0,
+      scrollSmooth    : true,
+      headingsOffset  : -boardTop
+    });
+    if (toc.find('.toc-list-item').length > 0) {
+      toc.css('visibility', 'visible');
+    }
+  });
+</script>
+
+
+  <script src=https://lib.baomitu.com/clipboard.js/2.0.10/clipboard.min.js></script>
+
+  <script>Fluid.plugins.codeWidget();</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/anchor-js/4.3.1/anchor.min.js', function() {
+    window.anchors.options = {
+      placement: CONFIG.anchorjs.placement,
+      visible  : CONFIG.anchorjs.visible
+    };
+    if (CONFIG.anchorjs.icon) {
+      window.anchors.options.icon = CONFIG.anchorjs.icon;
+    }
+    var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+    var res = [];
+    for (var item of el) {
+      res.push('.markdown-body > ' + item.trim());
+    }
+    if (CONFIG.anchorjs.placement === 'left') {
+      window.anchors.options.class = 'anchorjs-link-left';
+    }
+    window.anchors.add(res.join(', '));
+  });
+</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.js', function() {
+    Fluid.plugins.fancyBox();
+  });
+</script>
+
+
+  <script>Fluid.plugins.imageCaption();</script>
+
+  <script defer src="/js/leancloud.js" ></script>
+
+  <script  src="/js/local-search.js" ></script>
+
+
+
+
+
+<!-- 主题的启动项，将它保持在最底部 -->
+<!-- the boot of the theme, keep it at the bottom -->
+<script  src="/js/boot.js" ></script>
+
+
+  
+
+  <noscript>
+    <div class="noscript-warning">博客在允许 JavaScript 运行的环境下浏览效果更佳</div>
+  </noscript>
+<script>(function (w, d, s, id) {
+            if (typeof (w.webpushr) !== 'undefined') return; w.webpushr = w.webpushr || function () { (w.webpushr.q = w.webpushr.q || []).push(arguments) }; var js, fjs = d.getElementsByTagName(s)[0]; js = d.createElement(s); js.id = id; js.async = 1; js.src = "https://cdn.webpushr.com/app.min.js";fjs.parentNode.appendChild(js);}(window, document, 'script', 'webpushr-jssdk'));webpushr('setup', { 'key': 'BC7dn5_FpwuUPNgf04uAMGTyoREL8CvqMiaMQWlEqN40sED6j8haOxAoq12xuuqXDSwUz-ImS9kgroqsHrf9nok' });</script></body>
+</html>
